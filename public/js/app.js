@@ -46,7 +46,7 @@ async function renderTab(tab) {
 
   root.classList.add('active');
   await TABS[tab].render(root, ctx);
-  window.scrollTo(0, 0);
+  document.querySelector('main.views').scrollTop = 0;
 }
 
 function route() {

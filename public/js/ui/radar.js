@@ -4,10 +4,14 @@
 
 import { svg, clear } from './dom.js';
 
-const SIZE = 320;
+// SIZE is bigger than the data circle (R) needs — the gap is legroom for the axis name
+// labels (up to "Social Skills" / "Relationships"), which extend outward from a single
+// label ring instead of the old two-ring glyph+number layout.
+const SIZE = 420;
 const CX = SIZE / 2;
 const CY = SIZE / 2;
 const R = 118;
+const LABEL_RATIO = 1.2;
 const RINGS = [0.25, 0.5, 0.75, 1];
 
 const reduced = () =>
@@ -31,32 +35,30 @@ export function createRadar(container, axes, onAxisTap) {
 
   for (const r of RINGS) root.append(svg('polygon', { class: 'grid', points: ringPath(n, r) }));
 
+  const valueEls = [];
+
   axes.forEach((a, i) => {
     const [x, y] = point(i, n, 1);
     root.append(svg('line', { class: 'spoke', x1: CX, y1: CY, x2: x, y2: y }));
 
-    const [lx, ly] = point(i, n, 1.17);
+    const [lx, ly] = point(i, n, LABEL_RATIO);
+    const anchor = lx < CX - 4 ? 'end' : lx > CX + 4 ? 'start' : 'middle';
     const label = svg('text', {
       x: lx, y: ly,
-      'text-anchor': lx < CX - 4 ? 'end' : lx > CX + 4 ? 'start' : 'middle',
+      'text-anchor': anchor,
       'dominant-baseline': 'middle',
-      class: a.stale ? 'stale' : '',
+      class: `axis-label${a.stale ? ' stale' : ''}`,
     });
-    label.textContent = a.glyph;
+    const name = svg('tspan', { x: lx, dy: '-0.5em' });
+    name.textContent = a.name;
+    const value = svg('tspan', { x: lx, dy: '1.15em', class: 'axis-value' });
+    value.textContent = Math.round(a.value);
+    label.append(name, value);
     root.append(label);
+    valueEls.push(value);
 
-    const [vx, vy] = point(i, n, 1.34);
-    const val = svg('text', {
-      x: vx, y: vy,
-      'text-anchor': vx < CX - 4 ? 'end' : vx > CX + 4 ? 'start' : 'middle',
-      'dominant-baseline': 'middle',
-      class: a.stale ? 'stale' : '',
-    });
-    val.textContent = Math.round(a.value);
-    root.append(val);
-
-    // Generous invisible tap target — the glyphs are tiny, fingers are not.
-    const hit = svg('circle', { class: 'hit', cx: lx, cy: ly, r: 18 });
+    // Generous invisible tap target — small text, fingers are not.
+    const hit = svg('circle', { class: 'hit', cx: lx, cy: ly, r: 22 });
     hit.addEventListener('click', () => onAxisTap?.(a));
     root.append(hit);
   });
@@ -79,6 +81,11 @@ export function createRadar(container, axes, onAxisTap) {
   function setValues(next, { animate = true } = {}) {
     const target = next.map((a) => Math.max(0, Math.min(100, a.value)) / 100);
     if (frame) cancelAnimationFrame(frame);
+
+    // Numbers don't need to morph frame-by-frame like the polygon does — just land on the
+    // new window's value. Without this, switching W/M/Y/ALL re-shaped the chart but left
+    // every axis label showing the number from whichever window was active on page load.
+    next.forEach((a, i) => { valueEls[i].textContent = Math.round(a.value); });
 
     const apply = (vals) => {
       poly.setAttribute('points', vals.map((v, i) => point(i, n, v).join(',')).join(' '));

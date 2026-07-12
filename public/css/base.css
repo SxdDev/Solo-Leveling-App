@@ -4,6 +4,11 @@
 
 html, body {
   height: 100%;
+  /* The outer page never scrolls — only main.views does (below). A scrollable top-level
+     document is what makes mobile browsers grow/shrink their address bar, which yanks
+     position:fixed elements out from under themselves. Growth is the tab most likely to be
+     short enough to sit non-scrollable, which is why the bottom nav only "lifts" there. */
+  overflow: hidden;
   background: var(--bg-0);
   color: var(--text-1);
   font-family: var(--font-body);
@@ -98,8 +103,14 @@ header.sys-header {
 }
 
 main.views {
-  padding: calc(var(--head-h) + env(safe-area-inset-top) + var(--s3)) var(--pad)
-           calc(var(--nav-h) + env(safe-area-inset-bottom) + 88px);
+  position: fixed;
+  top: calc(var(--head-h) + env(safe-area-inset-top));
+  bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
+  left: 0; right: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--s3) var(--pad) calc(var(--s3) + 88px);
   max-width: 620px;
   margin: 0 auto;
 }

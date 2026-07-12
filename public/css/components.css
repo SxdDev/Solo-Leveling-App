@@ -212,8 +212,10 @@
 .radar .poly { fill: rgba(55, 200, 255, .13); stroke: var(--sys); stroke-width: 1.5; filter: drop-shadow(0 0 6px rgba(55,200,255,.5)); }
 .radar .vertex { fill: var(--sys); }
 .radar .vertex.stale { fill: var(--bg-0); stroke: var(--sys-dim); }
-.radar text { font-family: var(--font-mono); font-size: 8px; fill: var(--text-2); letter-spacing: .04em; }
+.radar text { font-family: var(--font-mono); font-size: 8.5px; fill: var(--text-2); letter-spacing: .02em; }
 .radar text.stale { fill: var(--sys-dim); }
+.radar .axis-value { fill: var(--sys); font-size: 9px; }
+.radar text.stale .axis-value { fill: var(--sys-dim); }
 .radar .hit { fill: transparent; cursor: pointer; }
 
 .level-big { font-family: var(--font-mono); font-size: 48px; color: var(--gold); line-height: 1; text-shadow: var(--glow-gold); }
