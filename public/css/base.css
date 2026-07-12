@@ -1,0 +1,181 @@
+/* base.css — reset, shell, header, bottom nav, the panel signature. */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg-0);
+  color: var(--text-1);
+  font-family: var(--font-body);
+  font-size: var(--t-body);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Cool grain over the whole app. Cheap, static, and it stops the black from reading as flat. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: .035;
+  background-image:
+    radial-gradient(circle at 20% 10%, rgba(55, 200, 255, .5), transparent 45%),
+    radial-gradient(circle at 85% 80%, rgba(55, 200, 255, .3), transparent 40%);
+}
+
+button, input, textarea, select { font: inherit; color: inherit; background: none; border: none; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--sys); outline-offset: 2px; }
+::selection { background: var(--sys-dim); color: var(--text-1); }
+
+/* Numbers never jitter. */
+.mono, .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.label {
+  font-family: var(--font-mono);
+  font-size: var(--t-label);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+/* ---------- Shell ---------- */
+
+#app { position: relative; z-index: 1; min-height: 100%; }
+
+header.sys-header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 20;
+  height: calc(var(--head-h) + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) var(--pad) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  background: rgba(5, 7, 13, .78);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+
+.level-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px; height: 34px;
+  border: 1px solid var(--gold);
+  clip-path: var(--clip);
+  color: var(--gold);
+  font-family: var(--font-mono);
+  box-shadow: var(--glow-gold);
+  flex: none;
+}
+.level-badge b { font-size: 17px; line-height: 1; font-weight: 600; }
+.level-badge span { font-size: 8px; letter-spacing: .1em; opacity: .7; }
+
+.xp-wrap { flex: 1; min-width: 0; }
+.xp-meta { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: .06em; }
+.xp-meta .cur { color: var(--gold); font-family: var(--font-mono); }
+.xp-meta .tot { color: var(--text-2); font-family: var(--font-mono); }
+.xp-track {
+  margin-top: 4px; height: 6px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  clip-path: polygon(3px 0, 100% 0, calc(100% - 3px) 100%, 0 100%);
+  overflow: hidden;
+}
+.xp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #8a6a1f, var(--gold));
+  transform-origin: left center;
+  transform: scaleX(0);
+  will-change: transform;
+}
+
+main.views {
+  padding: calc(var(--head-h) + env(safe-area-inset-top) + var(--s3)) var(--pad)
+           calc(var(--nav-h) + env(safe-area-inset-bottom) + 88px);
+  max-width: 620px;
+  margin: 0 auto;
+}
+.view { display: none; }
+.view.active { display: block; }
+
+nav.sys-nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 20;
+  height: calc(var(--nav-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  background: rgba(5, 7, 13, .86);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid var(--line);
+}
+nav.sys-nav button {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px;
+  min-height: var(--tap);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 9px; letter-spacing: .1em; text-transform: uppercase;
+  transition: color var(--d-fast) var(--e-out);
+}
+nav.sys-nav button .ico { font-size: 17px; line-height: 1; transition: text-shadow var(--d-fast) var(--e-out); }
+nav.sys-nav button[aria-current='true'] { color: var(--sys); }
+nav.sys-nav button[aria-current='true'] .ico { text-shadow: var(--glow-sys); }
+
+/* ---------- The signature: every panel is a system window ---------- */
+
+.panel {
+  position: relative;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  clip-path: var(--clip);
+  padding: var(--pad);
+  margin-bottom: var(--gap);
+}
+/* The corner-tick. This is the mark that makes a screenshot unmistakably this app. */
+.panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 10px; height: 1px;
+  background: var(--sys);
+  box-shadow: var(--glow-sys);
+}
+.panel::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 1px; height: 10px;
+  background: var(--sys);
+  box-shadow: var(--glow-sys);
+}
+.panel.gold::before, .panel.gold::after { background: var(--gold); box-shadow: var(--glow-gold); }
+
+.panel-title {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: var(--s3);
+}
+
+h1.screen { font-size: var(--t-title); font-weight: 600; letter-spacing: -.01em; margin-bottom: var(--s4); }
+h1.screen small { display: block; font-size: var(--t-label); }
+
+.stack > * + * { margin-top: var(--gap); }
+.muted { color: var(--text-2); font-size: var(--t-2); }
+.empty {
+  padding: var(--s5) var(--s4);
+  text-align: center;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: var(--t-2);
+  line-height: 1.6;
+}

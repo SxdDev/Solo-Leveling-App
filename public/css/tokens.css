@@ -1,0 +1,57 @@
+/* tokens.css — the design system (plan §7.1–7.3). Every color and size in the app comes
+   from here. Two accents, strictly separated: cyan is the SYSTEM, gold is REWARD.
+   If gold ever appears on something that isn't XP, a level, or a reward, that's a bug. */
+
+:root {
+  /* Surfaces — blue-black with cool grain. Never pure #000. */
+  --bg-0: #05070D;
+  --bg-1: #0A0F1A;
+  --bg-2: #111827;
+  --line: #1E2A3D;
+
+  /* Accents */
+  --sys: #37C8FF;
+  --sys-dim: #1B5E7A;
+  --gold: #F5C34D;
+
+  /* Text */
+  --text-1: #E8F0FA;
+  --text-2: #8FA3BD;
+
+  /* Semantic */
+  --warn: #FF5D73;
+  --ok: #3EE6A8;
+
+  /* Emission, not elevation. This UI has no drop shadows — only glow. */
+  --glow-sys: 0 0 12px rgba(55, 200, 255, .35);
+  --glow-gold: 0 0 14px rgba(245, 195, 77, .45);
+  --glow-ok: 0 0 12px rgba(62, 230, 168, .35);
+
+  /* Type. System stack for body (fast, native, free); the platform mono is the system VOICE.
+     No webfont download = nothing to cache, nothing to FOUT, nothing to go stale offline. */
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', 'Space Grotesk', Menlo, monospace;
+
+  --t-level: 34px;
+  --t-title: 22px;
+  --t-body: 17px;
+  --t-2: 15px;
+  --t-label: 12px;
+
+  /* 4px grid */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+  --pad: 16px;
+  --gap: 12px;
+  --nav-h: 56px;
+  --head-h: 52px;
+  --tap: 44px;
+
+  /* Motion */
+  --e-out: cubic-bezier(.22, 1, .36, 1);
+  --e-io: cubic-bezier(.65, 0, .35, 1);
+  --d-fast: 220ms;
+  --d-mid: 450ms;
+
+  /* Signature: the octagon clip. Every panel is a system window. */
+  --clip: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}

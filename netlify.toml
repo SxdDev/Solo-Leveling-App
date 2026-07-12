@@ -1,0 +1,30 @@
+# netlify.toml — static publish + one function. No build step (§2.1).
+
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+  command = "echo 'No build step. That is the point.'"
+
+[functions]
+  node_bundler = "esbuild"
+
+# SPA fallback so a hash route deep-link never 404s.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    # No inline scripts, no eval, no third-party anything. connect-src is self only:
+    # the client talks to the Netlify function, never to api.anthropic.com directly.
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+
+# The service worker must never be cached, or you can never ship an update.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"

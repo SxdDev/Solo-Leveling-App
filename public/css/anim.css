@@ -1,0 +1,114 @@
+/* anim.css — the animation spec (plan §7.4).
+   Law: only `transform` and `opacity` animate. Never width, never box-shadow spread.
+   Glow "pulses" are pre-rendered glow layers animated via opacity. */
+
+/* A1 — tab switch */
+.view.active { animation: viewIn var(--d-fast) var(--e-out) both; }
+@keyframes viewIn {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* A2 — XP bar fill. Transform-origin left, so scaleX is a fill. */
+.xp-fill { transition: transform var(--d-mid) var(--e-out); }
+.xp-track.pulse::after {
+  content: '';
+  position: absolute; inset: -3px;
+  box-shadow: var(--glow-gold);
+  animation: goldPulse 600ms var(--e-out);
+}
+.xp-wrap { position: relative; }
+@keyframes goldPulse { from { opacity: 1; } to { opacity: 0; } }
+
+/* A3 — XP fly-up */
+.flyup { animation: flyUp 600ms var(--e-out) forwards; }
+@keyframes flyUp {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-28px); }
+}
+
+/* A4 — check-off */
+.hexbox.pop { animation: pop 260ms var(--e-io); }
+@keyframes pop {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
+/* A5 — level up */
+.levelup {
+  position: fixed; inset: 0; z-index: 60;
+  display: grid; place-items: center;
+  background: rgba(5, 7, 13, .85);
+  opacity: 0;
+  animation: fadeIn 300ms var(--e-out) forwards;
+}
+@keyframes fadeIn { to { opacity: 1; } }
+.levelup .lu-card { text-align: center; }
+.levelup .lu-label { font-family: var(--font-mono); font-size: 12px; letter-spacing: .3em; color: var(--sys); }
+.levelup .lu-num {
+  font-family: var(--font-mono);
+  font-size: 84px; line-height: 1;
+  color: var(--gold);
+  text-shadow: 0 0 30px rgba(245, 195, 77, .8);
+  animation: luNum 500ms var(--e-out) both;
+}
+@keyframes luNum { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: scale(1); } }
+.levelup .lu-sub { margin-top: var(--s3); font-family: var(--font-mono); font-size: 12px; color: var(--text-2); }
+.spark {
+  position: absolute; top: 50%; left: 50%;
+  width: 3px; height: 3px;
+  background: var(--gold);
+  box-shadow: var(--glow-gold);
+  animation: spark 1200ms var(--e-out) both;
+}
+@keyframes spark {
+  from { opacity: 1; transform: translate(0, 0) scale(1); }
+  to   { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(.2); }
+}
+
+/* A7 — quest reveal */
+.quest.reveal { animation: fadeIn 400ms var(--e-out) both; }
+.quest.reveal > * { animation: questChild 700ms var(--e-out) both; }
+.quest.reveal > *:nth-child(2) { animation-delay: 60ms; }
+.quest.reveal > *:nth-child(3) { animation-delay: 120ms; }
+.quest.reveal .sigil { animation: sigil 700ms var(--e-out) both; }
+@keyframes questChild { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes sigil { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: scale(1); } }
+
+/* A8 — streak tick */
+.streak-fig.tick { animation: roll 300ms var(--e-out); }
+@keyframes roll {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* A10 — day cleared */
+.stamp { animation: stampIn 400ms var(--e-out) both; }
+@keyframes stampIn {
+  from { opacity: 0; transform: scale(1.4); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Toast */
+.toast { animation: fadeIn 200ms var(--e-out) both; }
+.toast.out { animation: fadeOut 200ms var(--e-out) forwards; }
+@keyframes fadeOut { to { opacity: 0; } }
+
+/* Reduced motion: durations collapse, fireworks become a static card.
+   The information survives; only the movement goes. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+  .spark { display: none; }
+}
+html[data-reduce-motion='true'] *,
+html[data-reduce-motion='true'] *::before,
+html[data-reduce-motion='true'] *::after {
+  animation-duration: .01ms !important;
+  transition-duration: .01ms !important;
+}
+html[data-reduce-motion='true'] .spark { display: none; }

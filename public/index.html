@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en" data-reduce-motion="false">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Solo Leveling</title>
+
+<meta name="theme-color" content="#05070D">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Solo Leveling">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+
+<link rel="stylesheet" href="/css/tokens.css">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/components.css">
+<link rel="stylesheet" href="/css/anim.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- The XP bar is the app's heartbeat: visible on every tab, because anything can grant XP. -->
+  <header class="sys-header">
+    <div class="level-badge" id="levelBadge">
+      <b class="num">1</b><span>LVL</span>
+    </div>
+    <div class="xp-wrap">
+      <div class="xp-meta">
+        <span class="cur" id="xpInto">0 / 100</span>
+        <span class="tot" id="xpTotal">0 XP</span>
+      </div>
+      <div class="xp-track" id="xpTrack"><div class="xp-fill" id="xpFill"></div></div>
+    </div>
+  </header>
+
+  <main class="views">
+    <section class="view" id="view-today"   aria-label="Today"></section>
+    <section class="view" id="view-journal" aria-label="Journal"></section>
+    <section class="view" id="view-growth"  aria-label="Growth"></section>
+    <section class="view" id="view-stats"   aria-label="Stats"></section>
+    <section class="view" id="view-you"     aria-label="You"></section>
+  </main>
+
+  <nav class="sys-nav" id="nav">
+    <button data-tab="today"   aria-current="true"><span class="ico">◇</span>Today</button>
+    <button data-tab="journal" aria-current="false"><span class="ico">▤</span>Log</button>
+    <button data-tab="growth"  aria-current="false"><span class="ico">◈</span>Growth</button>
+    <button data-tab="stats"   aria-current="false"><span class="ico">◎</span>Stats</button>
+    <button data-tab="you"     aria-current="false"><span class="ico">◆</span>You</button>
+  </nav>
+
+</div>
+
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "name": "solo-leveling",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Single-user offline-first life RPG. The client has no dependencies; these are for the Netlify function only.",
+  "scripts": {
+    "test": "node --test \"tests/*.test.js\"",
+    "test:tz": "TZ=America/New_York node --test \"tests/*.test.js\"",
+    "dev": "netlify dev",
+    "icons": "python3 tools/make_icons.py"
+  },
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "^6.2.5",
+    "jsdom": "^29.1.1",
+    "netlify-cli": "^17.38.0"
+  }
+}
