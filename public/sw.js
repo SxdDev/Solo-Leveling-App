@@ -2,7 +2,7 @@
 // for an offline-first app, you want to be able to READ your own service worker (§2.1).
 // Bump CACHE on every deploy.
 
-const CACHE = 'sl-v2';
+const CACHE = 'sl-v3';
 
 const SHELL = [
   '/',

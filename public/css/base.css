@@ -105,7 +105,7 @@ header.sys-header {
 main.views {
   position: fixed;
   top: calc(var(--head-h) + env(safe-area-inset-top));
-  bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
+  bottom: var(--nav-h);
   left: 0; right: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -115,17 +115,15 @@ main.views {
   margin: 0 auto;
 }
 .view { display: none; }
-/* Keep short tabs scrollable too. Mobile Safari otherwise changes its visual viewport only
-   for Growth, which looks like a mysterious gap under the navigation bar. */
-.view.active { display: block; min-height: calc(100% + 1px); }
+.view.active { display: block; }
 main.views:has(#view-today.active) { padding-bottom: calc(var(--s3) + 88px); }
 
 nav.sys-nav {
   position: fixed;
   bottom: 0; left: 0; right: 0;
   z-index: 20;
-  height: calc(var(--nav-h) + env(safe-area-inset-bottom));
-  padding-bottom: env(safe-area-inset-bottom);
+  height: var(--nav-h);
+  padding-bottom: 0;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   background: rgba(5, 7, 13, .86);

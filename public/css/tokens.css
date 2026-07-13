@@ -42,7 +42,9 @@
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
   --pad: 16px;
   --gap: 12px;
-  --nav-h: 56px;
+  /* Fixed visual height. iOS can report an inflated safe-area bottom in standalone mode;
+     folding that value into the bar creates a large black shelf below the tabs. */
+  --nav-h: 64px;
   --head-h: 52px;
   --tap: 44px;
 

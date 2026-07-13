@@ -243,7 +243,7 @@
   position: fixed; z-index: 41;
   left: 0; right: 0; bottom: 0;
   max-height: 82vh; overflow-y: auto;
-  padding: var(--s4) var(--pad) calc(var(--s5) + env(safe-area-inset-bottom));
+  padding: var(--s4) var(--pad) var(--s5);
   background: var(--bg-2);
   border-top: 1px solid var(--sys);
   box-shadow: 0 -1px 20px rgba(55, 200, 255, .18);
@@ -257,7 +257,7 @@
 .quickadd {
   position: fixed;
   left: 0; right: 0;
-  bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
+  bottom: var(--nav-h);
   z-index: 19;
   padding: var(--s2) var(--pad);
   background: rgba(5, 7, 13, .9);
@@ -282,7 +282,7 @@
 .toast {
   position: fixed; z-index: 45;
   left: 50%; transform: translateX(-50%);
-  bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 70px);
+  bottom: calc(var(--nav-h) + 70px);
   padding: var(--s2) var(--s4);
   background: var(--bg-2);
   border: 1px solid var(--sys);
