@@ -3,10 +3,11 @@
 
 export const BASE_XP = [10, 20, 35, 55, 80];        // difficulty 1–5, superlinear
 export const DAY_CLEAR_BONUS = 25;                   // all habits + quest done
+export const MISSED_DAILY_PENALTY = 5;               // per unfinished daily habit, capped at 0 total XP
 export const REBOOT_BONUS = 50;                      // first completion back after 3+ missed days
 export const MILESTONE_XP = BASE_XP[2];              // a milestone ≈ a difficulty-3 task
 export const GOAL_XP_BASE = 250;                     // × horizon multiplier
-export const HORIZON_MULT = { milestone: 1, dream: 4 };
+export const HORIZON_MULT = { daily: 0.2, weekly: 1, monthly: 3, milestone: 1, dream: 4 };
 
 // Anti-grind: the same template's yield decays within a day.
 // 1st = 100%, 2nd = 50%, 3rd = 25%, 4th+ = 0. Kills the "drink water ×10" exploit

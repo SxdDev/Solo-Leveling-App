@@ -31,18 +31,19 @@ const progressOf = (g) => {
 
 function goalSheet(existing, refresh) {
   sheet(existing ? 'Edit goal' : 'New goal', (close) => {
-    let horizon = existing?.horizon || 'milestone';
+    const horizons = ['daily', 'weekly', 'monthly', 'milestone', 'dream'];
+    const horizonLabel = (h) => `${h.toUpperCase()} ×${HORIZON_MULT[h]}`;
+    let horizon = existing?.horizon || 'weekly';
     let picked = new Set(Object.keys(existing?.statWeights || {}));
     const milestones = (existing?.milestones || []).map((m) => ({ ...m }));
 
     const title = el('input', { class: 'field', placeholder: 'What are you actually after?', value: existing?.title || '' });
 
-    const horizonRow = el('div', { class: 'seg' }, ...['milestone', 'dream'].map((h) => {
-      const b = el('button', { 'aria-pressed': String(horizon === h) },
-        h === 'dream' ? `DREAM ×${HORIZON_MULT.dream}` : `MILESTONE ×${HORIZON_MULT.milestone}`);
+    const horizonRow = el('div', { class: 'seg goal-horizons' }, ...horizons.map((h) => {
+      const b = el('button', { 'aria-pressed': String(horizon === h) }, horizonLabel(h));
       b.addEventListener('click', () => {
         horizon = h;
-        [...horizonRow.children].forEach((c, i) => c.setAttribute('aria-pressed', String(['milestone', 'dream'][i] === horizon)));
+        [...horizonRow.children].forEach((c, i) => c.setAttribute('aria-pressed', String(horizons[i] === horizon)));
         award.textContent = `Award: ${GOAL_XP_BASE * HORIZON_MULT[horizon]} XP`;
       });
       return b;
@@ -177,8 +178,6 @@ export async function render(root, ctx) {
   ));
 
   const active = goals.filter((g) => g.status === 'active');
-  const dreams = active.filter((g) => g.horizon === 'dream');
-  const miles = active.filter((g) => g.horizon === 'milestone');
   const achieved = goals.filter((g) => g.status === 'achieved');
 
   if (!active.length && !achieved.length) {
@@ -186,14 +185,16 @@ export async function render(root, ctx) {
       'No direction set. A level without a destination is just a number.'));
   }
 
-  if (dreams.length) {
-    root.append(el('div', { class: 'label', style: { margin: '16px 0 8px' } }, 'Dreams'));
-    dreams.forEach((g) => root.append(goalCard(g, heatFor(g), ctx.refresh)));
-  }
-  if (miles.length) {
-    root.append(el('div', { class: 'label', style: { margin: '16px 0 8px' } }, 'Milestones'));
-    miles.forEach((g) => root.append(goalCard(g, heatFor(g), ctx.refresh)));
-  }
+  const groups = [
+    ['daily', 'Daily goals'], ['weekly', 'Weekly goals'], ['monthly', 'Monthly goals'],
+    ['milestone', 'Milestones'], ['dream', 'Dreams'],
+  ];
+  groups.forEach(([horizon, title]) => {
+    const items = active.filter((g) => g.horizon === horizon);
+    if (!items.length) return;
+    root.append(el('div', { class: 'label', style: { margin: '16px 0 8px' } }, title));
+    items.forEach((g) => root.append(goalCard(g, heatFor(g), ctx.refresh)));
+  });
 
   if (achieved.length) {
     const hall = panel({ class: 'panel gold' },

@@ -58,7 +58,7 @@ export function summarize(payload) {
     exportedAt: payload.exportedAt,
     counts: Object.fromEntries(STORES.map((s) => [s, (payload.data?.[s] || []).length])),
     range: dates.length ? [dates[0], dates[dates.length - 1]] : null,
-    totalXp: c.filter((r) => !r.revoked).reduce((s, r) => s + (r.xp || 0), 0),
+    totalXp: Math.max(0, c.filter((r) => !r.revoked).reduce((s, r) => s + (r.xp || 0), 0)),
   };
 }
 

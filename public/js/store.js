@@ -5,7 +5,7 @@
 
 import * as db from './db.js';
 import { emit } from './bus.js';
-import { dayKey, addDays, daysBetween, trailingWindow } from './game/dates.js';
+import { dayKey, addDays, daysBetween, trailingWindow, isoWeekKey, monthKey } from './game/dates.js';
 import * as XP from './game/xp.js';
 import { computeRadar, weakestStats, TRAINABLE } from './game/stats.js';
 import { computeStreak, needsReboot } from './game/streaks.js';
@@ -24,6 +24,7 @@ const LS = {
   lastOpenDate: 'sl.lastOpenDate',
   deviceToken: 'sl.deviceToken',
   seeded: 'sl.seeded',
+  seedVersion: 'sl.seedVersion',
   lastExport: 'sl.lastExport',
 };
 
@@ -72,6 +73,7 @@ export async function saveTemplate(t) {
     statWeights: t.statWeights || {},
     difficulty: t.difficulty || 2,
     kind: t.kind || 'habit',
+    cadence: t.cadence || (t.kind === 'oneoff' ? 'once' : 'daily'),
     active: t.active !== false,
     createdAt: t.createdAt || nowIso(),
     archivedAt: t.archivedAt || null,
@@ -135,7 +137,13 @@ export async function complete({ templateId = null, name, difficulty = 2, statWe
 export async function revoke(id) {
   const row = await db.get('completions', id);
   if (!row || row.revoked) return;
-  if (row.date !== today()) return; // history is immutable once the day rolls over
+  const td = today();
+  const template = row.templateId ? await db.get('taskTemplates', row.templateId) : null;
+  const cadence = template?.cadence || (template?.kind === 'habit' ? 'daily' : 'once');
+  const inOpenPeriod = row.date === td
+    || (cadence === 'weekly' && isoWeekKey(row.date) === isoWeekKey(td))
+    || (cadence === 'monthly' && monthKey(row.date) === monthKey(td));
+  if (!inOpenPeriod) return; // closed periods are immutable
   await db.put('completions', { ...row, revoked: true });
   await recomputeDerived();
   emit('data:changed', { store: 'completions' });
@@ -306,7 +314,7 @@ const hasBonus = async (day, name) =>
 /** All active habits + the quest → +25 XP. Quiet stamp, not fireworks. */
 export async function checkDayClear(day = today()) {
   if (await hasBonus(day, 'Day cleared')) return false;
-  const habits = (await activeTemplates()).filter((t) => t.kind === 'habit');
+  const habits = (await activeTemplates()).filter((t) => t.kind === 'habit' && (t.cadence || 'daily') === 'daily');
   if (!habits.length) return false;
 
   const rows = (await completionsForDay(day)).filter((c) => !c.revoked);
@@ -335,6 +343,45 @@ export async function maybeRebootBonus(day = today()) {
   return { missed, grant: () => grantBonus('System reboot', XP.REBOOT_BONUS, { day }) };
 }
 
+/**
+ * Charge each unfinished habit once after its day closes. Penalties are ledger rows, just
+ * like rewards, so replaying the log is deterministic and reopening cannot charge twice.
+ * XP never drops below zero and missed work never creates a hidden XP debt.
+ */
+export async function applyMissedDailyPenalties(fromDay, toDay = today()) {
+  if (!fromDay || daysBetween(fromDay, toDay) <= 0) return [];
+
+  const templates = await allTemplates();
+  const added = [];
+  for (let day = fromDay; daysBetween(day, toDay) > 0; day = addDays(day, 1)) {
+    const rows = await completionsForDay(day);
+    const completed = new Set(rows.filter((c) => !c.revoked && c.source !== 'penalty').map((c) => c.templateId));
+    const alreadyCharged = new Set(rows.filter((c) => !c.revoked && c.source === 'penalty').map((c) => c.templateId));
+    const habits = templates.filter((t) => {
+      if (t.kind !== 'habit' || (t.cadence || 'daily') !== 'daily') return false;
+      const created = t.createdAt?.slice(0, 10) || day;
+      const archived = t.archivedAt?.slice(0, 10) || null;
+      return created <= day && (!archived || archived > day);
+    });
+
+    for (const habit of habits) {
+      if (completed.has(habit.id) || alreadyCharged.has(habit.id)) continue;
+      const available = Math.max(0, getDerived()?.totalXp ?? (await recomputeDerived()).totalXp);
+      if (available <= 0) continue;
+      const loss = Math.min(XP.MISSED_DAILY_PENALTY, available);
+      const row = {
+        id: uid(), templateId: habit.id, name: `Missed: ${habit.name}`, date: day,
+        completedAt: nowIso(), xp: -loss, statPoints: {}, source: 'penalty', revoked: false,
+      };
+      await db.put('completions', row);
+      await recomputeDerived();
+      added.push(row);
+    }
+  }
+  if (added.length) emit('data:changed', { store: 'completions' });
+  return added;
+}
+
 /* ---------- The derived snapshot ---------- */
 
 /**
@@ -349,10 +396,11 @@ export async function recomputeDerived() {
   const [completions, journal, goals] = await Promise.all([db.all('completions'), db.all('journalEntries'), db.all('goals')]);
   const live = completions.filter((c) => !c.revoked);
 
-  const totalXp = live.reduce((sum, c) => sum + (c.xp || 0), 0);
+  const totalXp = Math.max(0, live.reduce((sum, c) => sum + (c.xp || 0), 0));
   const { level, into, needed, ratio } = XP.progress(totalXp);
 
-  const logDays = new Set(live.map((c) => c.date));
+  // Penalties are bookkeeping, not activity; missing a habit must never preserve a streak.
+  const logDays = new Set(live.filter((c) => c.source !== 'penalty').map((c) => c.date));
   const journalDays = new Set(journal.filter((j) => j.wordCount > 0).map((j) => j.date));
 
   const logS = computeStreak(logDays, { now, rolloverHour: dayRolloverHour });
@@ -392,21 +440,42 @@ export async function recomputeDerived() {
 // Q-5: edit these to YOUR actual routine before you rely on Phase 1. An empty Today on day
 // one kills the loop before it starts, so the app refuses to open with nothing in it.
 export const STARTER_HABITS = [
-  { name: 'Journal the day',        difficulty: 2, statWeights: { intelligence: 0.6, discipline: 0.4 } },
-  { name: 'Train',                  difficulty: 4, statWeights: { health: 1.0, discipline: 0.4, looks: 0.3 } },
-  { name: 'Read 20 minutes',        difficulty: 2, statWeights: { intelligence: 1.0, discipline: 0.2 } },
-  { name: 'No junk food',           difficulty: 3, statWeights: { health: 0.8, discipline: 0.6 } },
-  { name: 'Deep work block',        difficulty: 4, statWeights: { productivity: 1.0, discipline: 0.5, money: 0.3 } },
-  { name: 'Sleep by target time',   difficulty: 3, statWeights: { health: 0.7, discipline: 0.5 } },
+  { name: 'Clean for 30 minutes', difficulty: 2, statWeights: { discipline: 0.7, productivity: 0.5 } },
+  { name: 'Run / cardio', difficulty: 3, statWeights: { health: 1, discipline: 0.3 } },
+  { name: 'Weight lifting session', difficulty: 4, statWeights: { health: 1, discipline: 0.4, looks: 0.3 } },
+  { name: 'Eat clean food only', difficulty: 3, statWeights: { health: 0.8, discipline: 0.6 } },
+  { name: 'Improve speaking ability', difficulty: 2, statWeights: { social: 0.8, status: 0.4 } },
+  { name: 'Read', difficulty: 2, statWeights: { intelligence: 1, discipline: 0.2 } },
+  { name: 'Learn about psychology', difficulty: 2, statWeights: { intelligence: 1, relationships: 0.3 } },
+  { name: 'Fix sleep', difficulty: 3, statWeights: { health: 0.8, discipline: 0.5 } },
+  { name: 'Journal / reflect', difficulty: 2, statWeights: { intelligence: 0.6, discipline: 0.4 } },
+  { name: 'Stretch', difficulty: 1, statWeights: { health: 0.7, discipline: 0.2 } },
+  { name: 'Practice a new skill', difficulty: 3, statWeights: { intelligence: 0.8, productivity: 0.5 } },
+  { name: 'Drink water', difficulty: 1, statWeights: { health: 1 } },
 ];
 
+const LEGACY_STARTER_NAMES = new Set([
+  'Journal the day', 'Train', 'Read 20 minutes', 'No junk food', 'Deep work block', 'Sleep by target time',
+]);
+const STARTER_VERSION = 2;
+
 export async function seedIfFirstLaunch() {
-  if (read(LS.seeded, false)) return false;
+  if ((read(LS.seedVersion, 0) >= STARTER_VERSION)) return false;
   const existing = await db.all('taskTemplates');
-  if (!existing.length) {
-    for (const h of STARTER_HABITS) await saveTemplate({ ...h, kind: 'habit' });
+  const migrationTime = nowIso();
+  const legacyMatches = existing.filter((t) => t.active && LEGACY_STARTER_NAMES.has(t.name));
+  // Require a recognizable bundle so a user-created task coincidentally named "Train" survives.
+  if (legacyMatches.length >= 3) {
+    for (const t of legacyMatches) {
+      await db.put('taskTemplates', { ...t, active: false, archivedAt: t.createdAt || migrationTime });
+    }
+  }
+  const names = new Set(existing.filter((t) => t.active && !LEGACY_STARTER_NAMES.has(t.name)).map((t) => t.name));
+  for (const h of STARTER_HABITS) {
+    if (!names.has(h.name)) await saveTemplate({ ...h, kind: 'habit' });
   }
   write(LS.seeded, true);
+  write(LS.seedVersion, STARTER_VERSION);
   return true;
 }
 

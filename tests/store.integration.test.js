@@ -35,6 +35,44 @@ test('first launch seeds starter habits exactly once', async () => {
   assert.equal((await store.activeTemplates()).length, first.length);
 });
 
+test('the requested daily routine is installed in full', async () => {
+  await reset();
+  await store.seedIfFirstLaunch();
+  const names = new Set((await store.activeTemplates()).map((t) => t.name));
+  for (const habit of store.STARTER_HABITS) assert.ok(names.has(habit.name), habit.name);
+  assert.equal(names.size, 12);
+});
+
+test('missed daily habits lose XP once, while completed habits are exempt', async () => {
+  await reset();
+  const missedDay = (await import('../public/js/game/dates.js')).addDays(store.today(), -1);
+  const done = await store.saveTemplate({ name: 'Done', difficulty: 1, statWeights: { health: 1 }, kind: 'habit' });
+  const missed = await store.saveTemplate({ name: 'Missed', difficulty: 1, statWeights: { health: 1 }, kind: 'habit' });
+  // Make both templates eligible on the simulated prior day.
+  await db.put('taskTemplates', { ...done, createdAt: `${missedDay}T12:00:00.000Z` });
+  await db.put('taskTemplates', { ...missed, createdAt: `${missedDay}T12:00:00.000Z` });
+  await store.complete({ name: 'Starting XP', xp: 20, statPoints: {}, day: missedDay });
+  await store.complete({ templateId: done.id, name: done.name, difficulty: 1, statWeights: done.statWeights, day: missedDay });
+
+  const charged = await store.applyMissedDailyPenalties(missedDay);
+  assert.equal(charged.length, 1);
+  assert.equal(charged[0].templateId, missed.id);
+  assert.equal(charged[0].xp, -XP.MISSED_DAILY_PENALTY);
+  assert.equal((await store.applyMissedDailyPenalties(missedDay)).length, 0, 'reopening cannot double-charge');
+});
+
+test('penalty-only days never preserve the activity streak', async () => {
+  await reset();
+  const { addDays } = await import('../public/js/game/dates.js');
+  const missedDay = addDays(store.today(), -1);
+  const earlier = addDays(missedDay, -1);
+  const habit = await store.saveTemplate({ name: 'Miss me', difficulty: 1, statWeights: {}, kind: 'habit' });
+  await db.put('taskTemplates', { ...habit, createdAt: `${missedDay}T12:00:00.000Z` });
+  await store.complete({ name: 'Earlier work', xp: 20, statPoints: {}, day: earlier });
+  await store.applyMissedDailyPenalties(missedDay);
+  assert.ok(!store.getDerived().activeDays.includes(missedDay));
+});
+
 test('a completion writes one row and moves the derived snapshot', async () => {
   await reset();
   await store.seedIfFirstLaunch();

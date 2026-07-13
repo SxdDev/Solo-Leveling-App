@@ -110,12 +110,15 @@ main.views {
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  padding: var(--s3) var(--pad) calc(var(--s3) + 88px);
+  padding: var(--s3) var(--pad);
   max-width: 620px;
   margin: 0 auto;
 }
 .view { display: none; }
-.view.active { display: block; }
+/* Keep short tabs scrollable too. Mobile Safari otherwise changes its visual viewport only
+   for Growth, which looks like a mysterious gap under the navigation bar. */
+.view.active { display: block; min-height: calc(100% + 1px); }
+main.views:has(#view-today.active) { padding-bottom: calc(var(--s3) + 88px); }
 
 nav.sys-nav {
   position: fixed;

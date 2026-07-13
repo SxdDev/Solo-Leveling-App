@@ -60,7 +60,7 @@ test('Today renders the quest, the habits, and the quick-add bar', async () => {
   assert.equal(r.querySelectorAll('.task').length, store.STARTER_HABITS.length, 'every starter habit should have a row');
   assert.ok(r.querySelector('.hexbox'), 'no check-off control');
   assert.ok(document.querySelector('.quickadd'), 'the quick-add bar is not pinned');
-  assert.ok(r.textContent.includes('Habits'));
+  assert.ok(r.textContent.includes('Daily tasks'));
 });
 
 test('tapping a hex checkbox actually grants XP and marks the row done', async () => {
@@ -91,6 +91,8 @@ test('Stats renders the radar with 11 axes and the window control', async () => 
   assert.ok(poly, 'no data polygon');
   assert.equal(poly.getAttribute('points').split(' ').length, 11, 'the polygon must have 11 vertices');
   assert.equal(svg.querySelectorAll('line.spoke').length, 11, '11 spokes');
+  assert.ok([...svg.querySelectorAll('.axis-label tspan:first-child')].some((n) => n.textContent === 'STATUS'),
+    'radar points should be written out by name');
 
   const seg = r.querySelectorAll('.seg button');
   assert.equal(seg.length, 4, 'W / M / Y / ALL');
@@ -149,6 +151,17 @@ test('Growth renders its empty state, then a goal with a progress ring', async (
   assert.equal(r.querySelector('.ring-label').textContent, '50', '1 of 2 steps = 50%');
   assert.equal(r.querySelectorAll('.ms').length, 2);
   assert.ok(r.querySelector('.ms.done'), 'the completed step is not struck through');
+});
+
+test('Growth supports daily, weekly, and monthly goal horizons', async () => {
+  for (const horizon of ['daily', 'weekly', 'monthly']) {
+    await store.saveGoal({ title: `${horizon} target`, horizon, milestones: [] });
+  }
+  const r = root();
+  await growth.render(r, ctx);
+  assert.ok(r.textContent.includes('Daily goals'));
+  assert.ok(r.textContent.includes('Weekly goals'));
+  assert.ok(r.textContent.includes('Monthly goals'));
 });
 
 test('You renders backup, settings and the danger zone', async () => {

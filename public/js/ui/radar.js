@@ -50,7 +50,7 @@ export function createRadar(container, axes, onAxisTap) {
       class: `axis-label${a.stale ? ' stale' : ''}`,
     });
     const name = svg('tspan', { x: lx, dy: '-0.5em' });
-    name.textContent = a.name;
+    name.textContent = a.name.toUpperCase();
     const value = svg('tspan', { x: lx, dy: '1.15em', class: 'axis-value' });
     value.textContent = Math.round(a.value);
     label.append(name, value);

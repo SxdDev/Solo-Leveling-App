@@ -59,7 +59,7 @@ export async function render(root, ctx) {
   const day = store.today();
   const derived = store.getDerived();
   const completions = await store.allCompletions();
-  const live = completions.filter((c) => !c.revoked);
+  const live = completions.filter((c) => !c.revoked && c.source !== 'penalty');
 
   const potentialInputs = {
     journalStreak: derived?.journalStreak || 0,
@@ -113,8 +113,7 @@ export async function render(root, ctx) {
   const chart = createRadar(holder, axes, (a) => statSheet(a, completions, day));
 
   if (!live.length) {
-    clear(holder);
-    holder.append(el('div', { class: 'empty' }, 'Insufficient data.\nAct, and the chart follows.'));
+    caption.textContent = 'Your attributes are labeled around the chart. Complete tasks to raise their values.';
   }
 
   /* XP per day for the window */

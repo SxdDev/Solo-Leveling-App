@@ -5,6 +5,7 @@ import { haptic } from './haptics.js';
 import * as store from '../store.js';
 import { STATS, TRAINABLE, statById } from '../game/stats.js';
 import * as XP from '../game/xp.js';
+import { isoWeekKey, monthKey } from '../game/dates.js';
 import { renderReviewCard } from '../ai/review.js';
 
 let lastUsedStats = ['health'];
@@ -122,7 +123,7 @@ function quickAddSheet(name, refresh) {
   sheet('New task', (close) => {
     let difficulty = 2;
     let picked = new Set(lastUsedStats); // smart default: your last mapping, preselected
-    let asHabit = false;
+    let cadence = 'once';
 
     const pipRow = el('div', { class: 'pips tappable' }, ...Array.from({ length: 5 }, (_, i) => {
       const p = el('button', { class: `pip${i < difficulty ? ' on' : ''}`, 'aria-label': `Difficulty ${i + 1}` });
@@ -148,11 +149,16 @@ function quickAddSheet(name, refresh) {
       return c;
     }));
 
-    const habitToggle = el('button', { class: 'chip', 'aria-pressed': 'false' }, '⟳', 'Save as habit');
-    habitToggle.addEventListener('click', () => {
-      asHabit = !asHabit;
-      habitToggle.setAttribute('aria-pressed', String(asHabit));
-    });
+    const cadences = ['once', 'daily', 'weekly', 'monthly'];
+    const cadenceRow = el('div', { class: 'seg' }, ...cadences.map((value) => {
+      const button = el('button', { 'aria-pressed': String(cadence === value) }, value);
+      button.addEventListener('click', () => {
+        cadence = value;
+        [...cadenceRow.children].forEach((c, i) => c.setAttribute('aria-pressed', String(cadences[i] === cadence)));
+        submitButton.textContent = cadence === 'once' ? 'Add and complete' : `Save ${cadence} task`;
+      });
+      return button;
+    }));
 
     const submit = async () => {
       if (!picked.size) { toast('Pick at least one stat.'); return; }
@@ -162,9 +168,9 @@ function quickAddSheet(name, refresh) {
 
       const t = await store.saveTemplate({
         name, difficulty, statWeights,
-        kind: asHabit ? 'habit' : 'oneoff',
+        kind: cadence === 'once' ? 'oneoff' : 'habit', cadence,
       });
-      if (!asHabit) {
+      if (cadence === 'once') {
         await store.complete({ templateId: t.id, name, difficulty, statWeights });
         haptic('tick');
       }
@@ -172,6 +178,8 @@ function quickAddSheet(name, refresh) {
       await store.checkDayClear();
       refresh();
     };
+
+    const submitButton = el('button', { class: 'btn primary', onClick: submit }, 'Add and complete');
 
     return el('div', { class: 'stack' },
       el('div', { class: 'panel' },
@@ -184,12 +192,12 @@ function quickAddSheet(name, refresh) {
         el('div', { class: 'label', style: { marginBottom: '10px' } }, 'Feeds which stats (max 3)'),
         chipRow,
       ),
-      el('div', { class: 'btn-row' },
-        habitToggle,
+      el('div', { class: 'panel' },
+        el('div', { class: 'label', style: { marginBottom: '10px' } }, 'Repeat'), cadenceRow,
       ),
       el('div', { class: 'btn-row', style: { marginTop: '8px' } },
         el('button', { class: 'btn ghost', onClick: close }, 'Cancel'),
-        el('button', { class: 'btn primary', onClick: submit }, asHabit ? 'Save habit' : 'Add and complete'),
+        submitButton,
       ),
     );
   });
@@ -202,13 +210,24 @@ let seenQuestToday = null;
 export async function render(root, ctx) {
   clear(root);
   const day = store.today();
-  const [templates, completions, quest] = await Promise.all([
+  const [templates, completions, allCompletions, quest] = await Promise.all([
     store.activeTemplates(),
     store.completionsForDay(day),
+    store.allCompletions(),
     store.ensureQuest(day),
   ]);
   const live = completions.filter((c) => !c.revoked);
-  const byTemplate = new Map(live.filter((c) => c.templateId).map((c) => [c.templateId, c]));
+  const templateMap = new Map(templates.map((t) => [t.id, t]));
+  const inCurrentPeriod = (c) => {
+    const t = templateMap.get(c.templateId);
+    const cadence = t?.cadence || (t?.kind === 'habit' ? 'daily' : 'once');
+    if (cadence === 'weekly') return isoWeekKey(c.date) === isoWeekKey(day);
+    if (cadence === 'monthly') return monthKey(c.date) === monthKey(day);
+    return c.date === day;
+  };
+  const byTemplate = new Map(allCompletions
+    .filter((c) => !c.revoked && c.templateId && c.source !== 'penalty' && inCurrentPeriod(c))
+    .map((c) => [c.templateId, c]));
 
   const firstView = seenQuestToday !== day;
   seenQuestToday = day;
@@ -228,20 +247,21 @@ export async function render(root, ctx) {
   const q = questCard(quest, ctx.refresh, firstView);
   if (q) root.append(q);
 
-  // Habits
-  const habitPanel = panel({},
-    el('div', { class: 'panel-title' },
-      el('span', { class: 'label' }, 'Habits'),
-      el('span', { class: 'label' }, `${habits.filter((h) => byTemplate.has(h.id)).length}/${habits.length}`)),
-  );
-  if (!habits.length) {
-    habitPanel.append(el('div', { class: 'empty' }, 'No habits yet. Add one below and it will be here tomorrow.'));
-  } else {
-    // Unchecked first — the work you still owe is what you should see.
-    const sorted = [...habits].sort((a, b) => Number(byTemplate.has(a.id)) - Number(byTemplate.has(b.id)));
+  // Recurring tasks. Weekly/monthly checks stay complete until their period resets.
+  const groups = [['daily', 'Daily tasks'], ['weekly', 'Weekly tasks'], ['monthly', 'Monthly tasks']];
+  groups.forEach(([cadence, label]) => {
+    const items = habits.filter((t) => (t.cadence || 'daily') === cadence);
+    if (!items.length && cadence !== 'daily') return;
+    const habitPanel = panel({},
+      el('div', { class: 'panel-title' },
+        el('span', { class: 'label' }, label),
+        el('span', { class: 'label' }, `${items.filter((h) => byTemplate.has(h.id)).length}/${items.length}`)),
+    );
+    if (!items.length) habitPanel.append(el('div', { class: 'empty' }, 'No daily tasks yet. Add one below.'));
+    const sorted = [...items].sort((a, b) => Number(byTemplate.has(a.id)) - Number(byTemplate.has(b.id)));
     sorted.forEach((t) => habitPanel.append(taskRow(t, byTemplate.get(t.id), ctx.refresh)));
-  }
-  root.append(habitPanel);
+    root.append(habitPanel);
+  });
 
   // One-offs
   if (oneoffs.length) {

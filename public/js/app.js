@@ -91,10 +91,18 @@ async function boot() {
   // Ask Safari not to evict us. Best effort; the real insurance is Export (§4.5, R-2).
   db.requestPersistence().catch(() => {});
 
-  const derived = await store.recomputeDerived();
+  let derived = await store.recomputeDerived();
   refreshHeader();
 
-  const { rolled } = store.rollover();
+  const { rolled, previous } = store.rollover();
+  if (rolled && previous) {
+    const penalties = await store.applyMissedDailyPenalties(previous);
+    if (penalties.length) {
+      derived = store.getDerived();
+      refreshHeader();
+      toast(`-${penalties.reduce((sum, p) => sum - p.xp, 0)} XP · ${penalties.length} missed daily task${penalties.length === 1 ? '' : 's'}.`);
+    }
+  }
   await store.ensureQuest();
 
   // Reboot check before anything renders — the pending bonus is granted on the next completion.
@@ -134,12 +142,16 @@ async function boot() {
   // The day can roll while the app sits open in the background.
   document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState !== 'visible') return;
-    const { rolled: r } = store.rollover();
+    const { rolled: r, previous } = store.rollover();
     if (r) {
+      const penalties = previous ? await store.applyMissedDailyPenalties(previous) : [];
       await store.recomputeDerived();
       await store.ensureQuest();
       refreshHeader();
       renderTab(current);
+      if (penalties.length) {
+        toast(`-${penalties.reduce((sum, p) => sum - p.xp, 0)} XP · ${penalties.length} missed daily task${penalties.length === 1 ? '' : 's'}.`);
+      }
     }
   });
 
