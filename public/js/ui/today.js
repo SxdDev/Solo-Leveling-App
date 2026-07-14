@@ -6,6 +6,7 @@ import * as store from '../store.js';
 import { STATS, TRAINABLE, statById } from '../game/stats.js';
 import * as XP from '../game/xp.js';
 import { isoWeekKey, monthKey } from '../game/dates.js';
+import { routineMomentKey } from '../game/routines.js';
 import { renderReviewCard } from '../ai/review.js';
 
 let lastUsedStats = ['health'];
@@ -66,6 +67,53 @@ function questCard(quest, refresh, firstView) {
           ),
     ),
   );
+  return card;
+}
+
+/* ---------- Timed routine quest cards ---------- */
+
+function routineQuestCard(routine, refresh, firstView) {
+  let working = false;
+  const card = panel({ class: `panel gold quest routine-quest${firstView ? ' reveal' : ''}` },
+    el('div', { class: 'quest-head' },
+      el('div', { class: 'sigil' }, routine.glyph),
+      el('div', { class: 'routine-title' },
+        el('div', { class: 'label' }, `ROUTINE QUEST · ${routine.doneCount}/${routine.steps.length}`),
+        el('div', { class: 'quest-name' }, routine.name),
+      ),
+      el('span', { class: 'quest-bonus routine-bonus' }, `+${routine.bonusXp} XP`),
+    ),
+    el('div', { class: `routine-notice${routine.id === 'morning' ? ' warning' : ''}` }, routine.notice),
+  );
+
+  routine.steps.forEach((step, index) => {
+    const done = !!routine.stepRows[step.id];
+    const row = el('div', { class: `routine-step${done ? ' done' : ''}` },
+      el('button', {
+        class: 'hexbox',
+        'aria-pressed': String(done),
+        'aria-label': done ? `Undo ${step.name}` : `Complete ${step.name}`,
+        onClick: async (event) => {
+          if (working) return;
+          working = true;
+          event.currentTarget.disabled = true;
+          haptic('tick');
+          const result = await store.toggleRoutineStep(routine.id, step.id);
+          if (result.award) {
+            haptic('double');
+            flyUp(card, result.award.xp);
+            toast(`${routine.name} cleared. +${result.award.xp} XP.`);
+            setTimeout(refresh, 280);
+          } else {
+            refresh();
+          }
+        },
+      }, tick()),
+      el('span', { class: 'routine-step-number' }, String(index + 1).padStart(2, '0')),
+      el('div', { class: 'task-name' }, step.name),
+    );
+    card.append(row);
+  });
   return card;
 }
 
@@ -206,15 +254,31 @@ function quickAddSheet(name, refresh) {
 /* ---------- Render ---------- */
 
 let seenQuestToday = null;
+let seenRoutineDay = null;
+let seenRoutineIds = new Set();
+let routineTimer = null;
+
+function watchRoutineSchedule(ctx, key) {
+  clearTimeout(routineTimer);
+  const now = new Date();
+  const untilNextMinute = 60_050 - (now.getSeconds() * 1000 + now.getMilliseconds());
+  routineTimer = setTimeout(() => {
+    if (routineMomentKey() !== key) ctx.refresh();
+    else watchRoutineSchedule(ctx, key);
+  }, untilNextMinute);
+  routineTimer.unref?.(); // Node smoke tests should not be held open by the browser-only watcher.
+}
 
 export async function render(root, ctx) {
   clear(root);
   const day = store.today();
-  const [templates, completions, allCompletions, quest] = await Promise.all([
+  const now = new Date();
+  const [templates, completions, allCompletions, quest, routines] = await Promise.all([
     store.activeTemplates(),
     store.completionsForDay(day),
     store.allCompletions(),
     store.ensureQuest(day),
+    store.activeRoutineStates(now),
   ]);
   const live = completions.filter((c) => !c.revoked);
   const templateMap = new Map(templates.map((t) => [t.id, t]));
@@ -243,6 +307,19 @@ export async function render(root, ctx) {
       'Today',
       el('small', { class: 'label' }, `${day} · ${xpToday} XP earned`)),
   );
+
+  const momentKey = routineMomentKey(now);
+  const routineDay = momentKey.slice(0, 10);
+  if (seenRoutineDay !== routineDay) {
+    seenRoutineDay = routineDay;
+    seenRoutineIds = new Set();
+  }
+  routines.forEach((routine) => {
+    const firstView = !seenRoutineIds.has(routine.id);
+    seenRoutineIds.add(routine.id);
+    root.append(routineQuestCard(routine, ctx.refresh, firstView));
+  });
+  watchRoutineSchedule(ctx, momentKey);
 
   const q = questCard(quest, ctx.refresh, firstView);
   if (q) root.append(q);
@@ -304,5 +381,7 @@ export async function render(root, ctx) {
 }
 
 export function teardown() {
+  clearTimeout(routineTimer);
+  routineTimer = null;
   document.querySelector('.quickadd')?.remove();
 }

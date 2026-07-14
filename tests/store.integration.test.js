@@ -43,6 +43,65 @@ test('the requested daily routine is installed in full', async () => {
   assert.equal(names.size, 12);
 });
 
+test('existing Fix sleep habit is migrated to Routine Followed without changing its id', async () => {
+  await reset();
+  const old = await store.saveTemplate({
+    name: 'Fix sleep', difficulty: 3, statWeights: { health: 0.8, discipline: 0.5 }, kind: 'habit',
+  });
+  store.lsWrite('sl.seedVersion', 2);
+
+  assert.equal(await store.seedIfFirstLaunch(), true);
+  const templates = await store.allTemplates();
+  const renamed = templates.find((template) => template.id === old.id);
+  assert.equal(renamed.name, 'Routine Followed');
+  assert.equal(templates.some((template) => template.name.toLowerCase() === 'fix sleep'), false);
+  assert.equal(templates.filter((template) => template.active && template.name === 'Routine Followed').length, 1);
+});
+
+test('Morning Quest persists checklist progress, awards XP once, then disappears for the day', async () => {
+  await reset();
+  await store.recomputeDerived();
+  const now = new Date('2026-07-13T14:00:00.000Z'); // 10 AM EDT
+  const [morning] = await store.activeRoutineStates(now);
+  assert.equal(morning.id, 'morning');
+  assert.equal(morning.doneCount, 0);
+
+  const first = await store.toggleRoutineStep('morning', morning.steps[0].id, now);
+  assert.equal(first.award, null);
+  assert.equal(first.state.doneCount, 1);
+  assert.equal(store.getDerived().totalXp, 0, 'partial progress does not pay XP');
+
+  for (const step of morning.steps.slice(1, -1)) {
+    const partial = await store.toggleRoutineStep('morning', step.id, now);
+    assert.equal(partial.award, null);
+  }
+  const cleared = await store.toggleRoutineStep('morning', morning.steps.at(-1).id, now);
+  assert.equal(cleared.award.xp, morning.bonusXp);
+  assert.equal(store.getDerived().totalXp, morning.bonusXp);
+  assert.deepEqual(await store.activeRoutineStates(now), [], 'completed routine stays gone today');
+
+  const repeat = await store.toggleRoutineStep('morning', morning.steps.at(-1).id, now);
+  assert.equal(repeat.award, null);
+  assert.equal(store.getDerived().totalXp, morning.bonusXp, 'reopening cannot pay twice');
+
+  const awardRows = (await store.completionsForDay(morning.day))
+    .filter((row) => !row.revoked && row.source === 'routine');
+  assert.equal(awardRows.length, 1);
+});
+
+test('routine checklists reset on the next Eastern calendar day', async () => {
+  await reset();
+  await store.recomputeDerived();
+  const firstDay = new Date('2026-07-13T14:00:00.000Z');
+  const nextDay = new Date('2026-07-14T14:00:00.000Z');
+  const morning = (await store.activeRoutineStates(firstDay))[0];
+  await store.toggleRoutineStep('morning', morning.steps[0].id, firstDay);
+
+  const nextMorning = (await store.activeRoutineStates(nextDay))[0];
+  assert.equal(nextMorning.day, '2026-07-14');
+  assert.equal(nextMorning.doneCount, 0);
+});
+
 test('missed daily habits lose XP once, while completed habits are exempt', async () => {
   await reset();
   const missedDay = (await import('../public/js/game/dates.js')).addDays(store.today(), -1);
@@ -76,7 +135,7 @@ test('penalty-only days never preserve the activity streak', async () => {
 test('a completion writes one row and moves the derived snapshot', async () => {
   await reset();
   await store.seedIfFirstLaunch();
-  const [gym] = (await store.activeTemplates()).filter((t) => t.name === 'Train');
+  const [gym] = (await store.activeTemplates()).filter((t) => t.name === 'Weight lifting session');
 
   const row = await store.complete({
     templateId: gym.id, name: gym.name,

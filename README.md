@@ -2,7 +2,7 @@
 
 Single-user, offline-first, iPhone-installed PWA. Tasks earn XP, XP drives a level, and an 11-axis radar shows what you're actually feeding. Built to the plan in `PLAN.md`; every deviation is listed below.
 
-**85 tests, all passing.** `npm test` (and `npm run test:tz` to re-run the date math under `America/New_York`, where DST actually bites).
+**97 tests, all passing.** `npm test` (and `npm run test:tz` to re-run the date math under `America/New_York`, where DST actually bites).
 
 ---
 
@@ -10,7 +10,7 @@ Single-user, offline-first, iPhone-installed PWA. Tasks earn XP, XP drives a lev
 
 ```bash
 npm install          # only the Netlify function has deps; the client has none
-npm test             # 85 tests: xp, dates, stats, streaks, quests, store, UI, backup
+npm test             # 97 tests: xp, dates, stats, streaks, quests, routines, store, UI, backup
 npx netlify dev      # http://localhost:8888
 ```
 

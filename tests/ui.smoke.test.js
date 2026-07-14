@@ -61,6 +61,11 @@ test('Today renders the quest, the habits, and the quick-add bar', async () => {
   assert.ok(r.querySelector('.hexbox'), 'no check-off control');
   assert.ok(document.querySelector('.quickadd'), 'the quick-add bar is not pinned');
   assert.ok(r.textContent.includes('Daily tasks'));
+  const morning = [...r.querySelectorAll('.routine-quest')]
+    .find((card) => card.textContent.includes('Morning Quest'));
+  assert.ok(morning, 'Morning Quest should be visible until completed');
+  assert.ok(morning.textContent.includes('NO SCREEN-TIME DURING THIS'));
+  assert.equal(morning.querySelectorAll('.routine-step').length, 7);
 });
 
 test('tapping a hex checkbox actually grants XP and marks the row done', async () => {

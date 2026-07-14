@@ -121,6 +121,41 @@
 .quest.done { border-color: var(--ok); }
 .quest.done .sigil { border-color: var(--ok); color: var(--ok); box-shadow: var(--glow-ok); }
 
+/* ---------- Timed routine quests ---------- */
+.routine-title { flex: 1; min-width: 0; }
+.routine-bonus { flex: none; }
+.routine-notice {
+  margin: var(--s3) 0;
+  padding: 7px var(--s3);
+  border-left: 2px solid var(--sys);
+  background: rgba(55, 200, 255, .06);
+  color: var(--sys);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: .08em;
+}
+.routine-notice.warning {
+  border-left-color: var(--warn);
+  background: rgba(255, 93, 115, .06);
+  color: var(--warn);
+}
+.routine-step {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-height: var(--tap);
+  padding: var(--s2) 0;
+  border-top: 1px solid var(--line);
+}
+.routine-step.done { opacity: .5; }
+.routine-step.done .task-name {
+  text-decoration: line-through;
+  text-decoration-color: var(--ok);
+}
+.routine-step.done .hexbox { border-color: var(--ok); background: rgba(62, 230, 168, .1); box-shadow: var(--glow-ok); }
+.routine-step.done .hexbox svg path { stroke-dashoffset: 0; transition: stroke-dashoffset 260ms var(--e-io); }
+.routine-step-number { color: var(--text-2); font-family: var(--font-mono); font-size: 10px; }
+
 /* ---------- Streak strip ---------- */
 .streak-row { display: flex; gap: var(--s5); margin-bottom: var(--s3); }
 .streak-fig { font-family: var(--font-mono); font-size: 24px; color: var(--text-1); }

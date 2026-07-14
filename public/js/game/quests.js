@@ -63,6 +63,7 @@ export function generateQuest({ date, weakest, level = 1, recentQuestIds = [], e
   const rand = seededRandom(date + salt);
   const cap = maxDifficulty(level);
   const blocked = new Set([...recentQuestIds, ...excludeIds]);
+  const excluded = new Set(excludeIds);
 
   const eligibleFor = (statId) => {
     const pool = QUEST_POOL[statId] || [];
@@ -71,13 +72,17 @@ export function generateQuest({ date, weakest, level = 1, recentQuestIds = [], e
 
     // Nothing fresh within the cap. Break the COOLDOWN before breaking the cap: a repeat is
     // mildly annoying, an over-your-level quest is demoralizing.
-    const byCap = pool.filter((q) => q.difficulty <= cap);
+    // Cooldowns may bend when a stat has no other suitable content, but an explicit reroll
+    // exclusion must not — otherwise the reroll button can hand back the exact same quest.
+    const byCap = pool.filter((q) => !excluded.has(q.id) && q.difficulty <= cap);
     if (byCap.length) return byCap;
 
     // Last resort — this stat has nothing at your level. Hand over its easiest quest, never
     // a random one, so the failure mode is "a bit of a stretch", not "impossible".
-    const easiest = Math.min(...pool.map((q) => q.difficulty));
-    return pool.filter((q) => q.difficulty === easiest);
+    const allowed = pool.filter((q) => !excluded.has(q.id));
+    if (!allowed.length) return [];
+    const easiest = Math.min(...allowed.map((q) => q.difficulty));
+    return allowed.filter((q) => q.difficulty === easiest);
   };
 
   // Try the weighted pick; if that stat's pool is exhausted, walk the others.

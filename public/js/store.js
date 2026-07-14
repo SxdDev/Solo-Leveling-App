@@ -10,6 +10,9 @@ import * as XP from './game/xp.js';
 import { computeRadar, weakestStats, TRAINABLE } from './game/stats.js';
 import { computeStreak, needsReboot } from './game/streaks.js';
 import { generateQuest, cooldownWindow } from './game/quests.js';
+import {
+  availableRoutines, easternClock, routineAwardTemplateId, routineById, routineStepTemplateId,
+} from './game/routines.js';
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID()
   : 'x'.replace(/x/, () => Date.now().toString(36) + Math.random().toString(36).slice(2)));
@@ -306,6 +309,96 @@ export async function completeQuest(day = today()) {
   return row;
 }
 
+/* ---------- Morning + night routine quests ---------- */
+
+const buildRoutineState = (routine, day, rows) => {
+  const live = rows.filter((row) => !row.revoked);
+  const stepRows = Object.fromEntries(routine.steps.map((step) => [
+    step.id,
+    live.find((row) => row.templateId === routineStepTemplateId(routine.id, step.id)) || null,
+  ]));
+  const award = live.find((row) => row.templateId === routineAwardTemplateId(routine.id)) || null;
+  return {
+    ...routine,
+    day,
+    stepRows,
+    doneCount: routine.steps.filter((step) => stepRows[step.id]).length,
+    completed: !!award,
+    award,
+  };
+};
+
+/** Only unlocked, unfinished routines are returned to Today. */
+export async function activeRoutineStates(now = new Date()) {
+  const day = easternClock(now).day;
+  const rows = await completionsForDay(day);
+  return availableRoutines(now)
+    .map((routine) => buildRoutineState(routine, day, rows))
+    .filter((state) => !state.completed);
+}
+
+export async function routineState(routineId, now = new Date()) {
+  const routine = routineById(routineId);
+  if (!routine || !availableRoutines(now).some((candidate) => candidate.id === routineId)) return null;
+  const day = easternClock(now).day;
+  return buildRoutineState(routine, day, await completionsForDay(day));
+}
+
+async function recordRoutineStep(routine, step, day) {
+  const row = {
+    id: uid(),
+    templateId: routineStepTemplateId(routine.id, step.id),
+    name: `${routine.name}: ${step.name}`,
+    date: day,
+    completedAt: nowIso(),
+    xp: 0,
+    statPoints: {},
+    source: 'routine-step',
+    revoked: false,
+  };
+  await db.put('completions', row);
+  await recomputeDerived();
+  emit('data:changed', { store: 'completions' });
+  return row;
+}
+
+/** Toggle one checklist item and automatically pay the routine award on the final item. */
+export async function toggleRoutineStep(routineId, stepId, now = new Date()) {
+  const routine = routineById(routineId);
+  const state = await routineState(routineId, now);
+  if (!routine || !state || state.completed) return { state, award: null };
+  const step = routine.steps.find((candidate) => candidate.id === stepId);
+  if (!step) return { state, award: null };
+
+  const existing = state.stepRows[stepId];
+  if (existing) {
+    await db.put('completions', { ...existing, revoked: true });
+    await recomputeDerived();
+    emit('data:changed', { store: 'completions' });
+    return { state: await routineState(routineId, now), award: null };
+  }
+
+  await recordRoutineStep(routine, step, state.day);
+  const updated = await routineState(routineId, now);
+  if (!updated || updated.doneCount !== routine.steps.length) return { state: updated, award: null };
+
+  // Re-read before awarding so rapid taps/reopens cannot pay this routine twice.
+  const alreadyAwarded = (await completionsForDay(state.day))
+    .some((row) => !row.revoked && row.templateId === routineAwardTemplateId(routine.id));
+  if (alreadyAwarded) return { state: await routineState(routineId, now), award: null };
+
+  const award = await complete({
+    templateId: routineAwardTemplateId(routine.id),
+    name: routine.name,
+    source: 'routine',
+    xp: routine.bonusXp,
+    statPoints: XP.statPointsFor(3, routine.statWeights, 0),
+    day: state.day,
+  });
+  emit('routine:completed', { routine, award });
+  return { state: await routineState(routineId, now), award };
+}
+
 /* ---------- Bonuses: day clear + reboot ---------- */
 
 const hasBonus = async (day, name) =>
@@ -447,7 +540,7 @@ export const STARTER_HABITS = [
   { name: 'Improve speaking ability', difficulty: 2, statWeights: { social: 0.8, status: 0.4 } },
   { name: 'Read', difficulty: 2, statWeights: { intelligence: 1, discipline: 0.2 } },
   { name: 'Learn about psychology', difficulty: 2, statWeights: { intelligence: 1, relationships: 0.3 } },
-  { name: 'Fix sleep', difficulty: 3, statWeights: { health: 0.8, discipline: 0.5 } },
+  { name: 'Routine Followed', difficulty: 3, statWeights: { health: 0.8, discipline: 0.5 } },
   { name: 'Journal / reflect', difficulty: 2, statWeights: { intelligence: 0.6, discipline: 0.4 } },
   { name: 'Stretch', difficulty: 1, statWeights: { health: 0.7, discipline: 0.2 } },
   { name: 'Practice a new skill', difficulty: 3, statWeights: { intelligence: 0.8, productivity: 0.5 } },
@@ -457,12 +550,17 @@ export const STARTER_HABITS = [
 const LEGACY_STARTER_NAMES = new Set([
   'Journal the day', 'Train', 'Read 20 minutes', 'No junk food', 'Deep work block', 'Sleep by target time',
 ]);
-const STARTER_VERSION = 2;
+const STARTER_VERSION = 3;
 
 export async function seedIfFirstLaunch() {
   if ((read(LS.seedVersion, 0) >= STARTER_VERSION)) return false;
   const existing = await db.all('taskTemplates');
   const migrationTime = nowIso();
+  // Preserve the original template id so past completions still connect to this habit.
+  for (const t of existing.filter((template) => template.name.toLowerCase() === 'fix sleep')) {
+    await db.put('taskTemplates', { ...t, name: 'Routine Followed' });
+    t.name = 'Routine Followed';
+  }
   const legacyMatches = existing.filter((t) => t.active && LEGACY_STARTER_NAMES.has(t.name));
   // Require a recognizable bundle so a user-created task coincidentally named "Train" survives.
   if (legacyMatches.length >= 3) {

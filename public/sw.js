@@ -2,7 +2,7 @@
 // for an offline-first app, you want to be able to READ your own service worker (§2.1).
 // Bump CACHE on every deploy.
 
-const CACHE = 'sl-v3';
+const CACHE = 'sl-v4';
 
 const SHELL = [
   '/',
@@ -23,6 +23,7 @@ const SHELL = [
   '/js/game/streaks.js',
   '/js/game/quests.js',
   '/js/game/questPool.js',
+  '/js/game/routines.js',
   '/js/ai/summarizer.js',
   '/js/ai/review.js',
   '/js/ui/dom.js',
